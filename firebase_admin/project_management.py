@@ -593,6 +593,7 @@ class _ProjectManagementService:
     IOS_APPS_RESOURCE_NAME = 'iosApps'
     IOS_APP_IDENTIFIER_NAME = 'bundleId'
     WEB_APPS_RESOURCE_NAME = 'webApps'
+    REMOTE_CONFIG_RESOURCE_NAME = 'remoteConfig'
 
     def __init__(self, app):
         project_id = app.project_id
@@ -815,6 +816,11 @@ class _ProjectManagementService:
         name = _check_not_none(certificate_to_delete, 'certificate_to_delete').name
         path = '/v1beta1/{0}'.format(name)
         self._make_request('delete', path)
+
+    def get_remote_config(self):
+        path = '/v1beta1/projects/-/remoteConfig'
+        response = self._make_request('get', path)
+        return response
 
     def _make_request(self, method, url, json=None):
         body, _ = self._body_and_response(method, url, json)
