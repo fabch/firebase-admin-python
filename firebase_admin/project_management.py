@@ -140,18 +140,17 @@ def create_ios_app(bundle_id, display_name=None, app=None):
     return _get_project_management_service(app).create_ios_app(bundle_id, display_name)
 
 
-def create_web_app(bundle_id, display_name=None, app=None):
+def create_web_app(display_name=None, app=None):
     """Creates a new Web app in the associated Firebase project.
 
     Args:
-        bundle_id: The bundle ID of the Web app to be created.
         display_name: A nickname for this Web app (optional).
         app: An App instance (optional).
 
     Returns:
         WebApp: An ``WebApp`` instance that is a reference to the newly created app.
     """
-    return _get_project_management_service(app).create_web_app(bundle_id, display_name)
+    return _get_project_management_service(app).create_web_app(display_name)
 
 
 def _check_is_string_or_none(obj, field_name):
@@ -176,6 +175,12 @@ def _check_not_none(obj, field_name):
     if obj is None:
         raise ValueError('{0} cannot be None.'.format(field_name))
     return obj
+
+
+def _check_is_list(obj, field_name):
+    if isinstance(obj, list) and obj:
+        return obj
+    raise ValueError('{0} must be a list.'.format(field_name))
 
 
 class AndroidApp:
@@ -479,9 +484,15 @@ class IOSAppMetadata(_AppMetadata):
 class WebAppMetadata(_AppMetadata):
     """Web-specific information about an Android Firebase app."""
 
-    def __init__(self, package_name, name, app_id, display_name, project_id):
+    def __init__(self, app_urls, name, app_id, display_name, project_id):
         """Clients should not instantiate this class directly."""
         super(WebAppMetadata, self).__init__(name, app_id, display_name, project_id)
+        self._app_urls = _check_is_list(app_urls, 'app_urls')
+
+    @property
+    def app_urls(self):
+        """The canonical bundle ID of this iOS app as it would appear in the iOS AppStore."""
+        return self._app_urls
 
     def __eq__(self, other):
         return super(WebAppMetadata, self).__eq__(other)
@@ -582,7 +593,6 @@ class _ProjectManagementService:
     IOS_APPS_RESOURCE_NAME = 'iosApps'
     IOS_APP_IDENTIFIER_NAME = 'bundleId'
     WEB_APPS_RESOURCE_NAME = 'webApps'
-    WEB_APP_IDENTIFIER_NAME = 'appId'
 
     def __init__(self, app):
         project_id = app.project_id
@@ -617,7 +627,7 @@ class _ProjectManagementService:
     def get_web_app_metadata(self, app_id):
         return self._get_app_metadata(
             platform_resource_name=_ProjectManagementService.WEB_APPS_RESOURCE_NAME,
-            identifier_name=_ProjectManagementService.WEB_APP_IDENTIFIER_NAME,
+            identifier_name=None,
             metadata_class=WebAppMetadata,
             app_id=app_id)
 
@@ -626,8 +636,11 @@ class _ProjectManagementService:
         _check_is_nonempty_string(app_id, 'app_id')
         path = '/v1beta1/projects/-/{0}/{1}'.format(platform_resource_name, app_id)
         response = self._make_request('get', path)
+        response_identifier = None
+        if identifier_name:
+            response_identifier = response[identifier_name]
         return metadata_class(
-            response[identifier_name],
+            response_identifier,
             name=response['name'],
             app_id=response['appId'],
             display_name=response.get('displayName') or None,
@@ -714,6 +727,14 @@ class _ProjectManagementService:
             display_name=display_name,
             app_class=IOSApp)
 
+    def create_web_app(self, display_name=None):
+        return self._create_app(
+            platform_resource_name=_ProjectManagementService.WEB_APPS_RESOURCE_NAME,
+            identifier_name=None,
+            identifier=None,
+            display_name=display_name,
+            app_class=IOSApp)
+
     def _create_app(
             self,
             platform_resource_name,
@@ -721,10 +742,12 @@ class _ProjectManagementService:
             identifier,
             display_name,
             app_class):
-        """Creates an Android or iOS app."""
+        """Creates an Android, iOS  or Web app."""
         _check_is_string_or_none(display_name, 'display_name')
         path = '/v1beta1/projects/{0}/{1}'.format(self._project_id, platform_resource_name)
-        request_body = {identifier_name: identifier}
+        request_body = {}
+        if identifier_name:
+            request_body[identifier_name] = identifier
         if display_name:
             request_body['displayName'] = display_name
         response = self._make_request('post', path, json=request_body)
