@@ -62,6 +62,19 @@ def ios_app(app_id, app=None):
     return IOSApp(app_id=app_id, service=_get_project_management_service(app))
 
 
+def web_app(app_id, app=None):
+    """Obtains a reference to an Web app in the associated Firebase project.
+
+    Args:
+        app_id: The app ID that identifies this iOS app.
+        app: An App instance (optional).
+
+    Returns:
+        WebApp: A ``WebApp`` instance.
+    """
+    return WebApp(app_id=app_id, service=_get_project_management_service(app))
+
+
 def list_android_apps(app=None):
     """Lists all Android apps in the associated Firebase project.
 
@@ -85,6 +98,18 @@ def list_ios_apps(app=None):
         list: a list of ``IOSApp`` instances referring to each iOS app in the Firebase project.
     """
     return _get_project_management_service(app).list_ios_apps()
+
+
+def list_web_apps(app=None):
+    """Lists all Web apps in the associated Firebase project.
+
+    Args:
+        app: An App instance (optional).
+
+    Returns:
+        list: a list of ``WebApp`` instances referring to each Web app in the Firebase project.
+    """
+    return _get_project_management_service(app).list_web_apps()
 
 
 def create_android_app(package_name, display_name=None, app=None):
@@ -113,6 +138,20 @@ def create_ios_app(bundle_id, display_name=None, app=None):
         IOSApp: An ``IOSApp`` instance that is a reference to the newly created app.
     """
     return _get_project_management_service(app).create_ios_app(bundle_id, display_name)
+
+
+def create_web_app(bundle_id, display_name=None, app=None):
+    """Creates a new Web app in the associated Firebase project.
+
+    Args:
+        bundle_id: The bundle ID of the Web app to be created.
+        display_name: A nickname for this Web app (optional).
+        app: An App instance (optional).
+
+    Returns:
+        WebApp: An ``WebApp`` instance that is a reference to the newly created app.
+    """
+    return _get_project_management_service(app).create_web_app(bundle_id, display_name)
 
 
 def _check_is_string_or_none(obj, field_name):
@@ -293,6 +332,62 @@ class IOSApp:
         return self._service.get_ios_app_config(self._app_id)
 
 
+class WebApp:
+    """A reference to an Wep app within a Firebase project.
+
+    Note: Unless otherwise specified, all methods defined in this class make an RPC.
+
+    Please use the module-level function ``web_app(app_id)`` to obtain instances of this class
+    instead of instantiating it directly.
+    """
+
+    def __init__(self, app_id, service):
+        self._app_id = app_id
+        self._service = service
+
+    @property
+    def app_id(self):
+        """Returns the app ID of the Web app to which this instance refers.
+
+        Note: This method does not make an RPC.
+
+        Returns:
+            string: The app ID of the iOS app to which this instance refers.
+        """
+        return self._app_id
+
+    def get_metadata(self):
+        """Retrieves detailed information about this Web app.
+
+        Returns:
+            WebAppMetadata: A ``WebAppMetadata`` instance.
+
+        Raises:
+            FirebaseError: If an error occurs while communicating with the Firebase Project
+                Management Service.
+        """
+        return self._service.get_web_app_metadata(self._app_id)
+
+    def set_display_name(self, new_display_name):
+        """Updates the display name attribute of this Web app to the one given.
+
+        Args:
+            new_display_name: The new display name for this Web app.
+
+        Returns:
+            NoneType: None.
+
+        Raises:
+            FirebaseError: If an error occurs while communicating with the Firebase Project
+                Management Service.
+        """
+        return self._service.set_ios_app_display_name(self._app_id, new_display_name)
+
+    def get_config(self):
+        """Retrieves the configuration artifact associated with this Web app."""
+        return self._service.get_web_app_config(self._app_id)
+
+
 class _AppMetadata:
     """Detailed information about a Firebase Android or iOS app."""
 
@@ -379,6 +474,24 @@ class IOSAppMetadata(_AppMetadata):
 
     def __hash__(self):
         return hash((self._name, self.app_id, self.display_name, self.project_id, self.bundle_id))
+
+
+class WebAppMetadata(_AppMetadata):
+    """Web-specific information about an Android Firebase app."""
+
+    def __init__(self, package_name, name, app_id, display_name, project_id):
+        """Clients should not instantiate this class directly."""
+        super(WebAppMetadata, self).__init__(name, app_id, display_name, project_id)
+
+    def __eq__(self, other):
+        return super(WebAppMetadata, self).__eq__(other)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(
+            (self._name, self.app_id, self.display_name, self.project_id))
 
 
 class SHACertificate:
@@ -468,6 +581,8 @@ class _ProjectManagementService:
     ANDROID_APP_IDENTIFIER_NAME = 'packageName'
     IOS_APPS_RESOURCE_NAME = 'iosApps'
     IOS_APP_IDENTIFIER_NAME = 'bundleId'
+    WEB_APPS_RESOURCE_NAME = 'webApps'
+    WEB_APP_IDENTIFIER_NAME = 'appId'
 
     def __init__(self, app):
         project_id = app.project_id
@@ -499,6 +614,13 @@ class _ProjectManagementService:
             metadata_class=IOSAppMetadata,
             app_id=app_id)
 
+    def get_web_app_metadata(self, app_id):
+        return self._get_app_metadata(
+            platform_resource_name=_ProjectManagementService.WEB_APPS_RESOURCE_NAME,
+            identifier_name=_ProjectManagementService.WEB_APP_IDENTIFIER_NAME,
+            metadata_class=WebAppMetadata,
+            app_id=app_id)
+
     def _get_app_metadata(self, platform_resource_name, identifier_name, metadata_class, app_id):
         """Retrieves detailed information about an Android or iOS app."""
         _check_is_nonempty_string(app_id, 'app_id')
@@ -523,6 +645,12 @@ class _ProjectManagementService:
             new_display_name=new_display_name,
             platform_resource_name=_ProjectManagementService.IOS_APPS_RESOURCE_NAME)
 
+    def set_web_app_display_name(self, app_id, new_display_name):
+        self._set_display_name(
+            app_id=app_id,
+            new_display_name=new_display_name,
+            platform_resource_name=_ProjectManagementService.WEB_APPS_RESOURCE_NAME)
+
     def _set_display_name(self, app_id, new_display_name, platform_resource_name):
         """Sets the display name of an Android or iOS app."""
         path = '/v1beta1/projects/-/{0}/{1}?updateMask=displayName'.format(
@@ -539,6 +667,11 @@ class _ProjectManagementService:
         return self._list_apps(
             platform_resource_name=_ProjectManagementService.IOS_APPS_RESOURCE_NAME,
             app_class=IOSApp)
+
+    def list_web_apps(self):
+        return self._list_apps(
+            platform_resource_name=_ProjectManagementService.WEB_APPS_RESOURCE_NAME,
+            app_class=WebApp)
 
     def _list_apps(self, platform_resource_name, app_class):
         """Lists all the Android or iOS apps within the Firebase project."""
@@ -627,6 +760,10 @@ class _ProjectManagementService:
     def get_ios_app_config(self, app_id):
         return self._get_app_config(
             platform_resource_name=_ProjectManagementService.IOS_APPS_RESOURCE_NAME, app_id=app_id)
+
+    def get_web_app_config(self, app_id):
+        return self._get_app_config(
+            platform_resource_name=_ProjectManagementService.WEB_APPS_RESOURCE_NAME, app_id=app_id)
 
     def _get_app_config(self, platform_resource_name, app_id):
         path = '/v1beta1/projects/-/{0}/{1}/config'.format(platform_resource_name, app_id)
