@@ -386,7 +386,7 @@ class WebApp:
             FirebaseError: If an error occurs while communicating with the Firebase Project
                 Management Service.
         """
-        return self._service.set_ios_app_display_name(self._app_id, new_display_name)
+        return self._service.set_web_app_display_name(self._app_id, new_display_name)
 
     def get_config(self):
         """Retrieves the configuration artifact associated with this Web app."""
@@ -791,9 +791,12 @@ class _ProjectManagementService:
     def _get_app_config(self, platform_resource_name, app_id):
         path = '/v1beta1/projects/-/{0}/{1}/config'.format(platform_resource_name, app_id)
         response = self._make_request('get', path)
-        # In Python 2.7, the base64 module works with strings, while in Python 3, it works with
-        # bytes objects. This line works in both versions.
-        return base64.standard_b64decode(response['configFileContents']).decode(encoding='utf-8')
+        if 'configFileContents' in response:
+            # In Python 2.7, the base64 module works with strings, while in Python 3, it works with
+            # bytes objects. This line works in both versions.
+            return base64.standard_b64decode(response['configFileContents']).decode(encoding='utf-8')
+        else:
+            return response
 
     def get_sha_certificates(self, app_id):
         path = '/v1beta1/projects/-/androidApps/{0}/sha'.format(app_id)
